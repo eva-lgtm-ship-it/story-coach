@@ -104,6 +104,7 @@ textarea{min-height:230px;resize:vertical}
 .guidebox summary{cursor:pointer;font:600 15px var(--display);color:var(--navy)}
 .guidebox ul{margin:6px 0 0}
 .codebox{margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+.codebox select{font:400 16px var(--body);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);max-width:260px}
 .codebox input{font:400 16px var(--body);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)}
 footer{font-size:14px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .35s ease-out}@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}}
@@ -199,6 +200,8 @@ footer{font-size:14px;color:var(--muted);text-align:center}
   </div>
 
   <footer>The coach never writes your story for you. Every word on your page is yours.
+    <div class="codebox" id="voiceRow" hidden><label for="voicePick">Coach voice</label> <select id="voicePick"></select> <button class="btn ghost" id="testVoice">Try it</button></div>
+    <div id="voiceTip" hidden style="margin-top:6px">Tip: open this page in Microsoft Edge for the most natural voices.</div>
     <div class="codebox" id="codeBox" hidden><label for="classCode">Class code</label> <input type="text" id="classCode" autocomplete="off" size="10"> <button class="btn ghost" id="saveCode">Save</button></div>
   </footer>
 </div>
@@ -392,16 +395,49 @@ async function ask(){
   }
 }
 function classCode(){ try{ return localStorage.getItem("msc:code") || "" }catch(e){ return "" } }
+$("voicePick").addEventListener("change",e=>{ try{ localStorage.setItem("msc:voice",e.target.value) }catch(_){} });
+$("testVoice").onclick = ()=>speak("Hi, composer. I like how your hero lives by the train tracks. What does your hero hear in the morning?");
 $("saveCode").onclick = ()=>{ try{ localStorage.setItem("msc:code",$("classCode").value.trim()) }catch(e){} $("codeBox").hidden = true; $("status").textContent = "Saved. Press Get feedback."; };
 
+// Voice: pick the most human-sounding voice on this laptop.
+// Edge on Windows has free neural voices ("Microsoft Ava/Jenny/Aria Online (Natural)").
+const VOICE_PREFS = [/Ava.*Natural/i,/Jenny.*Natural/i,/Aria.*Natural/i,/Emma.*Natural/i,/Michelle.*Natural/i,/Natural/i,/Google US English/i,/Samantha/i,/Online/i];
+let voices = [];
+function loadVoices(){
+  try{ voices = speechSynthesis.getVoices().filter(v=>/^en(-|_|$)/i.test(v.lang)); }catch(e){ voices = []; }
+  const sel = $("voicePick"); if(!sel) return;
+  const saved = (()=>{try{return localStorage.getItem("msc:voice")}catch(e){return null}})();
+  sel.innerHTML = "";
+  voices.forEach(v=>{ const o=document.createElement("option"); o.value=v.name; o.textContent=v.name.replace(/^Microsoft /,"").replace(/ - English.*$/,"").replace(/\s*\(.*?\)\s*$/," "+(/Natural/i.test(v.name)?"(natural)":"")).trim(); sel.append(o); });
+  const best = pickVoice();
+  if(saved && voices.some(v=>v.name===saved)) sel.value = saved; else if(best) sel.value = best.name;
+  $("voiceRow").hidden = voices.length < 2;
+  $("voiceTip").hidden = voices.some(v=>/Natural/i.test(v.name));
+}
+function pickVoice(){
+  try{ const saved = localStorage.getItem("msc:voice"); const v = voices.find(v=>v.name===saved); if(v) return v; }catch(e){}
+  for(const re of VOICE_PREFS){ const v = voices.find(v=>re.test(v.name) && /en-US/i.test(v.lang)) || voices.find(v=>re.test(v.name)); if(v) return v; }
+  return voices.find(v=>/en-US/i.test(v.lang)) || voices[0] || null;
+}
 function speak(txt){
   try{
     if(!("speechSynthesis" in window) || !txt.trim()){$("status").textContent="Hearing is not available on this device.";return}
     speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(txt); u.rate = 0.85;
-    speechSynthesis.speak(u);
+    if(!voices.length) loadVoices();
+    const v = pickVoice();
+    const natural = v && /Natural|Google/i.test(v.name);
+    // Speak sentence by sentence so there are small, natural pauses.
+    const parts = txt.replace(/\s+/g," ").match(/[^.!?]+[.!?]*["”']?/g) || [txt];
+    parts.forEach(p=>{
+      const u = new SpeechSynthesisUtterance(p.trim());
+      if(v){ u.voice = v; u.lang = v.lang; }
+      u.rate = natural ? 0.95 : 0.88;
+      u.pitch = 1.05;
+      speechSynthesis.speak(u);
+    });
   }catch(e){$("status").textContent="Hearing is not available on this device."}
 }
+if("speechSynthesis" in window){ loadVoices(); try{ speechSynthesis.addEventListener("voiceschanged", loadVoices) }catch(e){ speechSynthesis.onvoiceschanged = loadVoices } }
 function setMode(m){
   if(listening && m!=="say") stopListening();
   mode = m;
@@ -464,13 +500,8 @@ $("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
 if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
 $("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
 function hear(){
-  try{
-    if(!("speechSynthesis" in window)){$("status").textContent="Hearing is not available on this device.";return}
-    speechSynthesis.cancel();
-    const txt = lastFb ? `${lastFb.star} Your one question: ${lastFb.next_question}` : $("nextText").textContent;
-    const u = new SpeechSynthesisUtterance(txt); u.rate = 0.9;
-    speechSynthesis.speak(u);
-  }catch(e){$("status").textContent="Hearing is not available on this device."}
+  const txt = lastFb ? `${lastFb.star} Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
+  speak(txt);
 }
 
 function saveDraft(){
