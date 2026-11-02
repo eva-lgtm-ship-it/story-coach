@@ -51,7 +51,7 @@ ${b.qs.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 Student's Beat Sheet line for this beat: """${sheet || "(not given)"}"""
 ${studentPart}
 
-Reply with ONLY one JSON object, no other text, in this exact shape:
+Give your feedback by calling the give_feedback tool. The fields mean:
 {"star": "1-2 short sentences on what works, specific to their story",
  "star_quote": "2-8 exact words copied from the student's sentences",
  "answered": [true,false,true,true,false],
@@ -61,6 +61,30 @@ Reply with ONLY one JSON object, no other text, in this exact shape:
  "next_why": "very short: which page question or Make it mine box this helps",
  "guide_tip": "1 sentence for the adult guide on how to conference this child; may use adult words"${hasPhoto ? `,\n "transcript": "the student's sentences read from the photo"` : ""}}
 "answered" has 5 booleans, one per question, true when a sentence answers it. "mine.name" = the hero has a name. "mine.only_mine" = a place or thing only this story has. "mine.sound_feeling" = at least one sound or feeling word. "mine.beat_rule" = the beat follows the beat rule.`;
+}
+
+function feedbackTool(hasPhoto) {
+  const props = {
+    star: { type: "string", description: "1-2 short sentences on what works, specific to their story" },
+    star_quote: { type: "string", description: "2-8 exact words copied from the student's sentences" },
+    answered: { type: "array", items: { type: "boolean" }, minItems: 5, maxItems: 5, description: "one per page question, true when a sentence answers it" },
+    anchor: { type: "object", properties: { ok: { type: "boolean" }, note: { type: "string" } }, required: ["ok", "note"] },
+    mine: {
+      type: "object",
+      properties: { name: { type: "boolean" }, only_mine: { type: "boolean" }, sound_feeling: { type: "boolean" }, beat_rule: { type: "boolean" } },
+      required: ["name", "only_mine", "sound_feeling", "beat_rule"],
+    },
+    next_question: { type: "string", description: "the one question for the student" },
+    next_why: { type: "string" },
+    guide_tip: { type: "string" },
+  };
+  const required = ["star", "star_quote", "answered", "anchor", "mine", "next_question", "next_why", "guide_tip"];
+  if (hasPhoto) { props.transcript = { type: "string", description: "the student's sentences read from the photo" }; required.push("transcript"); }
+  return {
+    name: "give_feedback",
+    description: "Return the Story Coach feedback for one beat.",
+    input_schema: { type: "object", properties: props, required },
+  };
 }
 
 function parseJson(text) {
@@ -103,16 +127,25 @@ module.exports = async (req, res) => {
       },
       body: JSON.stringify({
         model: process.env.MODEL || "claude-sonnet-5-5",
-        max_tokens: 1200,
+        max_tokens: 2000,
+        tools: [feedbackTool(!!image)],
+        tool_choice: { type: "tool", name: "give_feedback" },
         messages: [{ role: "user", content }],
       }),
     });
     if (r.status === 429) { res.status(429).json({ error: "rate limited" }); return; }
     const data = await r.json();
     if (!r.ok) { console.error("Anthropic error", r.status, JSON.stringify(data).slice(0, 500)); res.status(502).json({ error: "upstream" }); return; }
-    const text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("");
-    const fb = parseJson(text);
-    if (!fb) { res.status(502).json({ error: "bad json" }); return; }
+    const call = (data.content || []).find(c => c.type === "tool_use" && c.name === "give_feedback");
+    let fb = call && call.input && typeof call.input === "object" ? call.input : null;
+    if (!fb) {
+      const text = (data.content || []).filter(c => c.type === "text").map(c => c.text).join("");
+      fb = parseJson(text);
+    }
+    if (!fb || !fb.next_question) {
+      console.error("No usable feedback", data.stop_reason, JSON.stringify(data.content || []).slice(0, 800));
+      res.status(502).json({ error: "bad json", stop_reason: data.stop_reason }); return;
+    }
     res.status(200).json(fb);
   } catch (e) {
     console.error(e);
