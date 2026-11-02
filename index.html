@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Maestro Story Coach</title>
+<meta name="description" content="AI Maestro story coach: say your beat out loud and get one strength and one question.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@500;600;700&display=swap">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+/* Layout: one column "binder page" — beat tabs on top, writing on the left, coach card on the right; stacks on phones. */
+:root{
+  --bg:#f3f5fa; --paper:#ffffff; --ink:#1e1e24; --muted:#555c6e; --line:#d9deea;
+  --navy:#1F3864; --navy-soft:#e6ebf6;
+  --setup:#3f9b4f; --setup-soft:#e3f3e5;
+  --tension:#d0453f; --tension-soft:#fbe4e2;
+  --turn:#c99a06; --turn-soft:#fdf3d0;
+  --res:#2f6fd0; --res-soft:#e1eaf8;
+  --ok:#2e8a46; --todo:#b8bfcf;
+  --display:'Fredoka','Trebuchet MS',sans-serif;
+  --body:'Andika','Trebuchet MS',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12151d; --paper:#1b2030; --ink:#eef0f6; --muted:#a6adc0; --line:#2f364a;
+  --navy:#9fb4ea; --navy-soft:#242c44;
+  --setup:#6cc77a; --setup-soft:#1f3326; --tension:#f07a73; --tension-soft:#3a2224;
+  --turn:#f0c43a; --turn-soft:#3a3218; --res:#7aa8f0; --res-soft:#1f2b42;
+  --ok:#6cc77a; --todo:#4a5268; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151d; --paper:#1b2030; --ink:#eef0f6; --muted:#a6adc0; --line:#2f364a;
+  --navy:#9fb4ea; --navy-soft:#242c44;
+  --setup:#6cc77a; --setup-soft:#1f3326; --tension:#f07a73; --tension-soft:#3a2224;
+  --turn:#f0c43a; --turn-soft:#3a3218; --res:#7aa8f0; --res-soft:#1f2b42;
+  --ok:#6cc77a; --todo:#4a5268; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:400 18px/1.5 var(--body);margin:0}
+.wrap{max-width:1100px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;border-bottom:3px solid var(--navy);padding-bottom:10px}
+.eyebrow{font:600 13px var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--navy)}
+h1{margin:0;font:700 clamp(30px,5vw,42px)/1.1 var(--display);color:var(--navy);text-wrap:balance}
+.tagline{color:var(--muted);font-size:16px;max-width:40ch}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tab{font:600 18px var(--display);border:3px solid var(--c);background:var(--paper);color:var(--ink);border-radius:14px;padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab small{font:500 12px var(--body);color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--c);color:#fff}
+.tab[aria-selected="true"] small{color:#fff}
+.tab:focus-visible,button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--navy);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:1fr}.tabs{grid-template-columns:repeat(2,1fr)}}
+.panel{background:var(--paper);border:2px solid var(--line);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel.beat{border-top:8px solid var(--c)}
+label.lbl,.lbl{display:block;font:600 16px var(--display);color:var(--navy)}
+input[type=text],textarea{width:100%;font:400 19px/1.55 var(--body);color:var(--ink);background:var(--paper);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+textarea{min-height:230px;resize:vertical}
+.qs{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.qs li{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;font-size:17px}
+.dot{width:26px;height:26px;border-radius:50%;border:3px solid var(--todo);display:inline-flex;align-items:center;justify-content:center;font:700 13px var(--display);color:var(--muted)}
+.dot.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.anchor-tag{font:600 11px var(--display);letter-spacing:.08em;text-transform:uppercase;background:var(--c-soft);color:var(--ink);border-radius:6px;padding:1px 6px;margin-left:6px}
+.meter{display:flex;flex-wrap:wrap;gap:8px 16px;font:500 15px var(--display);color:var(--muted);font-variant-numeric:tabular-nums}
+.meter b{color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{font:600 19px var(--display);border:0;border-radius:999px;padding:12px 22px;cursor:pointer;background:var(--navy);color:var(--paper)}
+.btn.ghost{background:transparent;color:var(--navy);border:2px solid var(--navy);padding:10px 18px;font-size:16px}
+.btn:disabled{opacity:.55;cursor:wait}
+.coach-head{display:flex;align-items:center;gap:10px}
+.baton{width:44px;height:44px;flex:none}
+.coach-head h2{margin:0;font:700 24px var(--display);color:var(--navy)}
+.card{border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.card h3{margin:0;font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase}
+.star{background:var(--c-soft)}
+.next{background:var(--navy-soft);border:3px solid var(--navy)}
+.next p{font:600 22px/1.35 var(--display);margin:0;color:var(--ink)}
+.quote{font-style:italic;color:var(--muted)}
+.mine{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:16px}
+@media (max-width:420px){.mine{grid-template-columns:1fr}}
+.mine span{display:flex;gap:8px;align-items:center}
+.status{font:500 16px var(--display);color:var(--muted);min-height:1.4em}
+.example-flag{font:600 12px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:2px dashed var(--line);border-radius:8px;padding:2px 8px;align-self:flex-start}
+.music{font-size:15px;color:var(--muted);border-top:2px dashed var(--line);padding-top:10px}
+.guide{font-size:14px;color:var(--muted);background:var(--bg);border-radius:10px;padding:8px 12px}
+.guide b{color:var(--ink)}
+
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mode{font:600 17px var(--display);border:2px solid var(--line);background:var(--paper);color:var(--ink);border-radius:14px;padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+.mode svg{width:30px;height:30px}
+.mode[aria-pressed="true"]{border-color:var(--navy);background:var(--navy-soft);box-shadow:inset 0 0 0 1px var(--navy)}
+.help{background:var(--navy-soft);border-radius:12px;padding:10px 14px;font-size:16px;display:flex;flex-direction:column;gap:6px}
+.help b{font-family:var(--display)}
+.help ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.drop{border:3px dashed var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.drop img{max-height:260px;border-radius:10px;border:2px solid var(--line)}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.saybig{align-self:center;display:flex;align-items:center;gap:14px;font:700 34px var(--display);letter-spacing:.04em;color:#fff;background:var(--c);border:0;border-radius:999px;padding:16px 40px;cursor:pointer;min-height:76px;box-shadow:0 4px 0 rgba(0,0,0,.18)}
+.saybig svg{width:40px;height:40px}
+.saybig[aria-pressed="true"]{background:var(--tension)}
+@media (prefers-reduced-motion:no-preference){.saybig[aria-pressed="true"]{animation:pulse 1.4s ease-in-out infinite}@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(208,69,63,.18)}}}
+.saystep{text-align:center;font:500 19px var(--display)}
+.guidebox{font-size:15px;color:var(--muted)}
+.guidebox summary{cursor:pointer;font:600 15px var(--display);color:var(--navy)}
+.guidebox ul{margin:6px 0 0}
+.codebox{margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+.codebox input{font:400 16px var(--body);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)}
+footer{font-size:14px;color:var(--muted);text-align:center}
+@media (prefers-reduced-motion:no-preference){.pop{animation:pop .35s ease-out}@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">AI Maestro · Story-to-Symphony</div>
+      <h1>Maestro Story Coach</h1>
+    </div>
+    <div class="tagline">Write your beat. The coach finds what is working and asks you one question. You are the composer. You decide what to change.</div>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Choose your beat" id="tabs"></div>
+
+  <div class="grid">
+    <section class="panel beat" id="writePanel" aria-labelledby="beatTitle">
+      <h2 id="beatTitle" style="margin:0;font:700 26px var(--display)"></h2>
+      <div>
+        <label class="lbl" for="sheetLine">My Beat Sheet says</label>
+        <input type="text" id="sheetLine" autocomplete="off" placeholder="Copy your Beat Sheet line here">
+      </div>
+      <div>
+        <div class="lbl" style="margin-bottom:6px">My 5 questions</div>
+        <ol class="qs" id="qs"></ol>
+      </div>
+      <div>
+        <div class="lbl" style="margin-bottom:6px">How do I share my beat?</div>
+        <div class="modes" role="group" aria-label="How do I share my beat?">
+          <button class="mode" data-mode="say" aria-pressed="true"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="11" y="3" width="10" height="17" rx="5" fill="var(--c)"/><path d="M7 15a9 9 0 0 0 18 0M16 24v5M11 29h10" stroke="var(--navy)" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>Say it</button>
+          <button class="mode" data-mode="photo" aria-pressed="false" id="photoModeBtn"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="9" width="26" height="18" rx="4" fill="none" stroke="var(--navy)" stroke-width="2.5"/><path d="M11 9l2-4h6l2 4" stroke="var(--navy)" stroke-width="2.5" fill="none" stroke-linejoin="round"/><circle cx="16" cy="18" r="5" fill="var(--c)"/></svg>Show my page</button>
+          <button class="mode" data-mode="type" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="8" width="26" height="16" rx="3" fill="none" stroke="var(--navy)" stroke-width="2.5"/><path d="M8 13h2M13 13h2M18 13h2M23 13h1M9 19h14" stroke="var(--c)" stroke-width="2.5" stroke-linecap="round"/></svg>Type it</button>
+        </div>
+      </div>
+      <div class="help" id="sayHelp">
+        <button class="saybig" id="sayBtn" aria-pressed="false"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="11" y="3" width="10" height="17" rx="5" fill="currentColor"/><path d="M7 15a9 9 0 0 0 18 0M16 24v5M11 29h10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg><span id="sayLabel">SAY IT</span></button>
+        <div id="sayStep" class="saystep">Tap <b>SAY IT</b> and talk. Tap <b>STOP</b> when you are done.</div>
+        <div id="sayFallback" class="guidebox" hidden>This browser cannot listen. Open this page in <b>Microsoft Edge</b> or <b>Google Chrome</b>, or press <b>Windows key + H</b> and talk into the box.</div>
+      </div>
+      <div class="drop" id="photoPanel" hidden>
+        <div>Write your page with a pencil first. Then add a photo of it.</div>
+        <div style="font-size:14px;color:var(--muted)">On the laptop: take the photo with the Camera app first, then press the button below and pick it.</div>
+        <img id="photoPreview" alt="Photo of my script page" hidden>
+        <label class="btn filebtn" id="photoLabel">Add my photo<input type="file" id="photoInput" accept="image/*" capture="environment"></label>
+        <div style="font-size:14px;color:var(--muted)" id="photoNote">The coach reads your handwriting and types it for you. You will hear it back.</div>
+      </div>
+      <div>
+        <label class="lbl" for="story">My sentences (1 answer = 1 sentence)</label>
+        <textarea id="story" spellcheck="true" placeholder="Tap SAY IT, then talk. Your words show up here."></textarea>
+      </div>
+      <div class="meter" id="meter"></div>
+      <div class="row">
+        <button class="btn" id="askBtn">Get feedback</button>
+        <button class="btn ghost" id="stopBtn" hidden>Stop</button>
+        <button class="btn ghost" id="hearMineBtn">Hear my sentences</button>
+        <span class="status" id="status" role="status"></span>
+      </div>
+      <div class="music" id="musicTip"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="coachTitle" id="coachPanel">
+      <div class="coach-head">
+        <svg class="baton" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="21" fill="var(--navy-soft)"/><path d="M10 34 L32 12" stroke="var(--navy)" stroke-width="3.5" stroke-linecap="round"/><circle cx="11" cy="33" r="4" fill="var(--c)"/><path d="M30 26c3 0 5 2 5 4" stroke="var(--c)" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M28 31c2 0 3 1 3 2" stroke="var(--c)" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>
+        <h2 id="coachTitle">Coach notes</h2>
+      </div>
+      <div class="example-flag" id="exampleFlag">Example: Bolt's Setup</div>
+      <div class="card star pop" id="starCard">
+        <h3>What's working</h3>
+        <div id="starText"></div>
+        <div class="quote" id="starQuote"></div>
+      </div>
+      <div class="card next pop" id="nextCard">
+        <h3>Your one question</h3>
+        <p id="nextText"></p>
+        <div style="font-size:15px;color:var(--muted)" id="nextWhy"></div>
+      </div>
+      <div class="card" style="border:2px solid var(--line)">
+        <h3>Make it mine</h3>
+        <div class="mine" id="mine"></div>
+      </div>
+      <div class="card" style="border:2px solid var(--line)">
+        <h3>Anchor line</h3>
+        <div id="anchorText"></div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="hearBtn">Hear it</button>
+        <span style="font-size:14px;color:var(--muted)">Reads the coach notes out loud.</span>
+      </div>
+      <div class="guide" id="guideTip"></div>
+    </section>
+  </div>
+
+  <footer>The coach never writes your story for you. Every word on your page is yours.
+    <div class="codebox" id="codeBox" hidden><label for="classCode">Class code</label> <input type="text" id="classCode" autocomplete="off" size="10"> <button class="btn ghost" id="saveCode">Save</button></div>
+  </footer>
+</div>
+
+<script>
+const BEATS = {
+  setup: {name:"Setup", color:"green", c:"--setup", sub:"Meet my hero",
+    qs:["Who is my hero?","Where does my hero live?","What does my hero do every day?","What does my hero love?","What does my hero want most?"],
+    rule:"Show the hero's normal world before anything goes wrong. Nothing bad happens yet.",
+    music:"Music tip: your hero's tune plays here for the first time. Can you hear your hero's instrument?"},
+  tension: {name:"Tension", color:"red", c:"--tension", sub:"The hard thing",
+    qs:["What goes wrong?","What does my hero try first?","What happens?","How does my hero feel? What do they say?","What makes it even harder?"],
+    rule:"Something goes wrong. The hero tries, and it does not work yet. It gets harder.",
+    music:"Music tip: stuck music. Slow, low, quiet, or one instrument alone. Does your story feel stuck too?"},
+  turn: {name:"Turn", color:"yellow", c:"--turn", sub:"Something changes",
+    qs:["Who or what helps my hero?","What new idea or strategy does my hero try?","What does my hero do differently?","What happens this time?","How does it feel?"],
+    rule:"The change comes from a new strategy or a helper. It is not magic. The hero does something different.",
+    music:"Music tip: this is where the music starts to change. What sound tells us your hero found a new idea?"},
+  resolution: {name:"Resolution", color:"blue", c:"--res", sub:"My hero grows",
+    qs:["What can my hero do now?","What changed for my hero?","How does my hero feel?","What did my hero learn?","What happens next?"],
+    rule:"Show what the hero can do now that they could not do before, and what they learned.",
+    music:"Music tip: growth music. Fast, high, bright, or everybody playing. Does your ending feel like it grows?"}
+};
+const ORDER = ["setup","tension","turn","resolution"];
+
+const EXAMPLE = {
+  beat:"setup",
+  sheet:"Bolt is a little robot who wants to sing.",
+  story:"Bolt is a small robot. He lives in a junkyard by the train tracks. Every day he sorts bolts and listens to the trains go clang clang. He loves the birds on the fence. Bolt wants to sing like the birds more than anything.",
+  fb:{
+    star:"You put your hero in a real place. The junkyard by the train tracks is a place only your story has.",
+    star_quote:"the trains go clang clang",
+    answered:[true,true,true,true,true],
+    anchor:{ok:true,note:"\"Bolt is a small robot.\" is short and clear. Easy to learn by heart."},
+    mine:{name:true,only_mine:true,sound_feeling:true,beat_rule:true},
+    next_question:"How does Bolt feel when he hears the birds sing and he can't?",
+    next_why:"This can make question 5 even stronger.",
+    guide_tip:"All 5 answered. Push for one feeling word in the last sentence; let Bolt's wish land before Tension."
+  }
+};
+
+const $ = id => document.getElementById(id);
+let beat = "setup", ctl = null, lastFb = null, mode = "say", photo = null;
+const store = {
+  get(k){try{return JSON.parse(localStorage.getItem("msc:"+k))}catch(e){return null}},
+  set(k,v){try{localStorage.setItem("msc:"+k,JSON.stringify(v))}catch(e){}}
+};
+let drafts = store.get("drafts") || {};
+
+function setBeatColors(){
+  const b = BEATS[beat];
+  document.documentElement.style.setProperty("--c", `var(${b.c})`);
+  document.documentElement.style.setProperty("--c-soft", `var(${b.c}-soft)`);
+}
+function renderTabs(){
+  $("tabs").innerHTML = "";
+  ORDER.forEach(k=>{
+    const b = BEATS[k], t = document.createElement("button");
+    t.className="tab"; t.role="tab"; t.id="tab-"+k;
+    t.style.setProperty("--c",`var(${b.c})`);
+    t.setAttribute("aria-selected", k===beat ? "true":"false");
+    t.innerHTML = `<span>${b.name}</span><small>${b.sub}</small>`;
+    t.onclick = ()=>switchBeat(k);
+    $("tabs").append(t);
+  });
+}
+function renderQs(answered){
+  const b = BEATS[beat];
+  $("qs").innerHTML = "";
+  b.qs.forEach((q,i)=>{
+    const li = document.createElement("li");
+    const d = document.createElement("span");
+    d.className = "dot" + (answered && answered[i] ? " done":"");
+    d.textContent = answered && answered[i] ? "✓" : (i+1);
+    const tx = document.createElement("span");
+    tx.textContent = q;
+    if(i===0){const a=document.createElement("span");a.className="anchor-tag";a.textContent="Anchor";tx.append(a)}
+    li.append(d,tx); $("qs").append(li);
+  });
+}
+function countSentences(s){return (s.match(/[^.!?]+[.!?]+/g)||[]).filter(x=>x.trim().length>1).length + (/[^.!?\s]\s*$/.test(s.trim()) && s.trim() ? 1:0)}
+function renderMeter(){
+  const s = $("story").value;
+  const words = (s.trim().match(/\S+/g)||[]).length;
+  const sents = s.trim() ? countSentences(s) : 0;
+  $("meter").innerHTML = `<span>Sentences: <b>${sents}</b> / 5</span><span>Words: <b>${words}</b> (aim for 60–80)</span>`;
+}
+function renderBeat(){
+  const b = BEATS[beat];
+  setBeatColors();
+  $("beatTitle").textContent = `${b.name} (${b.color} page)`;
+  $("beatTitle").style.color = `var(${b.c})`;
+  $("musicTip").textContent = b.music;
+  const d = drafts[beat] || {};
+  $("sheetLine").value = d.sheet || "";
+  $("story").value = d.story || "";
+  renderQs(d.fb ? d.fb.answered : null);
+  renderMeter();
+  if(d.fb){showFb(d.fb,false)} else {showEmptyCoach()}
+}
+function switchBeat(k){if(listening) stopListening();beat=k;renderTabs();renderBeat()}
+
+const MINE = [["name","My hero's name"],["only_mine","A place or thing only MY story has"],["sound_feeling","A sound or feeling word"],["beat_rule","The beat rule"]];
+function showFb(fb,isExample){
+  lastFb = fb;
+  $("exampleFlag").hidden = !isExample;
+  $("starText").textContent = fb.star || "";
+  $("starQuote").textContent = fb.star_quote ? `“${fb.star_quote}”` : "";
+  $("nextText").textContent = fb.next_question || "";
+  $("nextWhy").textContent = fb.next_why || "";
+  $("mine").innerHTML = "";
+  MINE.forEach(([k,l])=>{
+    const ok = fb.mine && fb.mine[k];
+    const s = document.createElement("span");
+    s.innerHTML = `<span class="dot ${ok?"done":""}" aria-hidden="true">${ok?"✓":""}</span>`;
+    s.append(l + (ok?"":" (not yet)"));
+    $("mine").append(s);
+  });
+  $("anchorText").textContent = fb.anchor ? fb.anchor.note : "";
+  $("guideTip").innerHTML = "";
+  if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
+  $("guideTip").hidden = !fb.guide_tip;
+  ["starCard","nextCard"].forEach(id=>{const e=$(id);e.classList.remove("pop");void e.offsetWidth;e.classList.add("pop")});
+  if(!isExample) renderQs(fb.answered);
+}
+function showEmptyCoach(){
+  $("exampleFlag").hidden = true;
+  $("starText").textContent = "Write your sentences, then press Get feedback.";
+  $("starQuote").textContent = "";
+  $("nextText").textContent = "Start with question 1. Who is in this beat?";
+  $("nextWhy").textContent = "";
+  $("mine").innerHTML = "";
+  MINE.forEach(([k,l])=>{const s=document.createElement("span");s.innerHTML=`<span class="dot" aria-hidden="true"></span>`;s.append(l);$("mine").append(s)});
+  $("anchorText").textContent = "Your answer to question 1 is your anchor line. Keep it short so you can learn it by heart.";
+  $("guideTip").hidden = true;
+  lastFb = null;
+}
+
+function copyFor(code){
+  return ({
+    bad_code:"Ask your guide for the class code, type it at the bottom of the page, and press Save.",
+    not_granted:"The coach is turned off for this page. Ask your guide.",
+    sampling_disabled:"The coach is not available on this account. Use the 5 questions as your checklist.",
+    rate_limited:"The coach needs a short break. Try again in a minute.",
+    session_expired:"Please sign in again, then try.",
+    refused:"The coach could not read this one. Ask your guide to look.",
+    invalid_json:"The coach got mixed up. Press Get feedback again.",
+    empty_completion:"The coach had nothing to say. Add a sentence and try again."
+  })[code] || "Something went wrong. Press Get feedback again.";
+}
+
+async function shrink(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=url});
+    const k = Math.min(1, 1568/Math.max(img.naturalWidth,img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth*k); c.height = Math.round(img.naturalHeight*k);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return c.toDataURL("image/jpeg",0.85).split(",")[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+async function ask(){
+  if(listening) stopListening();
+  const story = $("story").value.trim();
+  if(!photo && story.split(/\s+/).length < 4){$("status").textContent = mode==="photo" ? "Add a photo of your page first." : "Say or write at least one sentence first.";return}
+  ctl = new AbortController();
+  $("askBtn").disabled = true; $("stopBtn").hidden = false;
+  $("status").textContent = "The coach is reading your beat...";
+  try{
+    const body = {beat, sheet:$("sheetLine").value.slice(0,300), story:$("story").value.slice(0,3000)};
+    if(photo){ $("status").textContent = "The coach is reading your page..."; body.image = await shrink(photo); }
+    const r = await fetch("/api/feedback",{method:"POST",signal:ctl.signal,headers:{"content-type":"application/json","x-class-code":classCode()},body:JSON.stringify(body)});
+    if(r.status===401){ $("codeBox").hidden = false; throw {code:"bad_code"}; }
+    if(r.status===429) throw {code:"rate_limited"};
+    if(!r.ok) throw {code:"upstream_error"};
+    const fb = await r.json();
+    if(!fb || typeof fb !== "object" || !fb.next_question) throw {code:"invalid_json"};
+    fb.answered = Array.isArray(fb.answered) ? fb.answered.slice(0,5).map(Boolean) : [false,false,false,false,false];
+    fb.mine = fb.mine || {};
+    if(photo && typeof fb.transcript === "string" && fb.transcript.trim()){
+      $("story").value = fb.transcript.trim(); renderMeter(); saveDraft();
+    }
+    drafts[beat] = {...(drafts[beat]||{}), fb}; store.set("drafts",drafts);
+    showFb(fb,false);
+    $("status").textContent = photo ? "Done. Press Hear my sentences to check the coach read your page right." : "Done. Press Hear it to hear your one question.";
+  }catch(e){
+    $("status").textContent = (e && e.name==="AbortError") ? "" : copyFor(e && e.code);
+  }finally{
+    $("askBtn").disabled = false; $("stopBtn").hidden = true; ctl = null;
+  }
+}
+function classCode(){ try{ return localStorage.getItem("msc:code") || "" }catch(e){ return "" } }
+$("saveCode").onclick = ()=>{ try{ localStorage.setItem("msc:code",$("classCode").value.trim()) }catch(e){} $("codeBox").hidden = true; $("status").textContent = "Saved. Press Get feedback."; };
+
+function speak(txt){
+  try{
+    if(!("speechSynthesis" in window) || !txt.trim()){$("status").textContent="Hearing is not available on this device.";return}
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt); u.rate = 0.85;
+    speechSynthesis.speak(u);
+  }catch(e){$("status").textContent="Hearing is not available on this device."}
+}
+function setMode(m){
+  if(listening && m!=="say") stopListening();
+  mode = m;
+  document.querySelectorAll(".mode").forEach(b=>b.setAttribute("aria-pressed", b.dataset.mode===m ? "true":"false"));
+  $("sayHelp").hidden = m!=="say";
+  $("photoPanel").hidden = m!=="photo";
+  if(m!=="photo"){ photo = null; $("photoPreview").hidden = true; }
+  $("story").placeholder = m==="say" ? "Tap SAY IT, then talk. Your words show up here." : m==="photo" ? "The coach will type your page here." : "Type your sentences here.";
+  try{localStorage.setItem("msc:mode",m)}catch(e){}
+}
+document.querySelectorAll(".mode").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$("photoInput").addEventListener("change",e=>{
+  const f = e.target.files && e.target.files[0];
+  if(!f) return;
+  photo = f;
+  const r = new FileReader();
+  r.onload = ()=>{ $("photoPreview").src = r.result; $("photoPreview").hidden = false; };
+  r.readAsDataURL(f);
+  $("photoLabel").firstChild.textContent = "Add a new photo";
+  $("status").textContent = "Got it. Press Get feedback.";
+});
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, base = "", finals = "";
+function tidy(p){ p = p.trim(); if(!p) return ""; p = p[0].toUpperCase()+p.slice(1); if(!/[.!?]$/.test(p)) p += "."; return p; }
+function setSaying(on){
+  listening = on;
+  $("sayBtn").setAttribute("aria-pressed", on ? "true":"false");
+  $("sayLabel").textContent = on ? "STOP" : "SAY IT";
+  $("sayStep").innerHTML = on ? "I'm listening. Say your sentences. Tap <b>STOP</b> when you are done." : "Tap <b>SAY IT</b> and talk. Tap <b>STOP</b> when you are done.";
+}
+function startListening(){
+  const t = $("story");
+  if(t.value === EXAMPLE.story){ t.value=""; $("sheetLine").value=""; renderMeter(); renderQs(null); showEmptyCoach(); }
+  base = t.value.trim() ? t.value.trim()+" " : ""; finals = "";
+  rec = new SR(); rec.lang = "en-US"; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = ev=>{
+    let interim = "";
+    for(let i=ev.resultIndex;i<ev.results.length;i++){
+      const r = ev.results[i];
+      if(r.isFinal) finals += tidy(r[0].transcript)+" "; else interim += r[0].transcript;
+    }
+    t.value = base + finals + interim; renderMeter();
+  };
+  rec.onerror = ev=>{
+    if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){ $("status").textContent = "Let the page use the microphone: tap the lock next to the web address and allow Microphone."; stopListening(); }
+    else if(ev.error==="network"){ $("status").textContent = "Listening needs the internet. Check the Wi-Fi."; stopListening(); }
+    else if(ev.error==="audio-capture"){ $("status").textContent = "No microphone found on this laptop."; stopListening(); }
+  };
+  rec.onend = ()=>{ if(listening){ base = t.value.trim() ? t.value.trim()+" " : ""; finals=""; try{ rec.start() }catch(e){ stopListening() } } };
+  try{ rec.start(); setSaying(true); $("status").textContent = ""; }catch(e){ $("status").textContent = "The microphone did not start. Tap SAY IT again."; }
+}
+function stopListening(){
+  setSaying(false);
+  try{ rec && rec.stop() }catch(e){}
+  rec = null;
+  const t = $("story"); t.value = t.value.replace(/\s+$/,""); saveDraft(); renderMeter();
+  if(t.value.trim()) $("status").textContent = "Press Hear my sentences to check them.";
+}
+$("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
+if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
+$("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
+function hear(){
+  try{
+    if(!("speechSynthesis" in window)){$("status").textContent="Hearing is not available on this device.";return}
+    speechSynthesis.cancel();
+    const txt = lastFb ? `${lastFb.star} Your one question: ${lastFb.next_question}` : $("nextText").textContent;
+    const u = new SpeechSynthesisUtterance(txt); u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }catch(e){$("status").textContent="Hearing is not available on this device."}
+}
+
+function saveDraft(){
+  drafts[beat] = {...(drafts[beat]||{}), sheet:$("sheetLine").value, story:$("story").value};
+  store.set("drafts",drafts);
+}
+$("story").addEventListener("input",()=>{renderMeter();saveDraft()});
+$("sheetLine").addEventListener("input",saveDraft);
+$("askBtn").onclick = ask;
+$("stopBtn").onclick = ()=>ctl && ctl.abort();
+$("hearBtn").onclick = hear;
+
+// First view: Bolt's Setup as a marked example, unless this viewer has their own drafts.
+const hasDrafts = Object.values(drafts).some(d=>d && (d.story||"").trim());
+if(!hasDrafts){
+  drafts.setup = {sheet:EXAMPLE.sheet, story:EXAMPLE.story};
+  renderTabs(); renderBeat(); showFb(EXAMPLE.fb,true); renderQs(EXAMPLE.fb.answered);
+  drafts = {};
+  $("story").addEventListener("focus",function clear(){ if($("story").value===EXAMPLE.story){$("story").value="";$("sheetLine").value="";renderMeter();renderQs(null);showEmptyCoach()} $("story").removeEventListener("focus",clear)});
+}else{renderTabs();renderBeat()}
+
+try{ const m = localStorage.getItem("msc:mode"); if(m) setMode(m); else setMode("say"); }catch(e){ setMode("say"); }
+</script>
+</body>
+</html>
