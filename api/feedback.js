@@ -135,7 +135,7 @@ module.exports = async (req, res) => {
     });
     if (r.status === 429) { res.status(429).json({ error: "rate limited" }); return; }
     const data = await r.json();
-    if (!r.ok) { console.error("Anthropic error", r.status, JSON.stringify(data).slice(0, 500)); res.status(502).json({ error: "upstream" }); return; }
+    if (!r.ok) { console.error("Anthropic error", r.status, JSON.stringify(data).slice(0, 500)); res.status(502).json({ error: "upstream", status: r.status, detail: (data && data.error && data.error.message || "").slice(0, 300) }); return; }
     const call = (data.content || []).find(c => c.type === "tool_use" && c.name === "give_feedback");
     let fb = call && call.input && typeof call.input === "object" ? call.input : null;
     if (!fb) {
