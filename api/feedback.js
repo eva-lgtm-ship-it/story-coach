@@ -51,7 +51,7 @@ ${b.qs.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 Student's Beat Sheet line for this beat: """${sheet || "(not given)"}"""
 ${studentPart}
 
-Give your feedback by calling the give_feedback tool. The fields mean:
+Give your feedback by calling the give_feedback tool exactly once. Do not write any other text. The fields mean:
 {"star": "1-2 short sentences on what works, specific to their story",
  "star_quote": "2-8 exact words copied from the student's sentences",
  "answered": [true,false,true,true,false],
@@ -129,7 +129,7 @@ module.exports = async (req, res) => {
         model: process.env.MODEL || "claude-sonnet-5-5",
         max_tokens: 2000,
         tools: [feedbackTool(!!image)],
-        tool_choice: { type: "tool", name: "give_feedback" },
+        tool_choice: { type: "auto" },
         messages: [{ role: "user", content }],
       }),
     });
