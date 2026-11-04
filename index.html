@@ -106,6 +106,13 @@ textarea{min-height:230px;resize:vertical}
 .codebox{margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
 .codebox select{font:400 16px var(--body);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);max-width:260px}
 .codebox input{font:400 16px var(--body);padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)}
+.ingr-note{font-size:15px;color:var(--muted);margin:2px 0 8px}
+.glue{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 8px}
+.glue-lbl{font:600 14px var(--display);color:var(--muted)}
+.chip{font:600 16px var(--display);border:2px solid var(--c);background:var(--c-soft);color:var(--ink);border-radius:999px;padding:6px 14px;cursor:pointer;min-height:40px}
+.shape{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font:600 13px var(--display);color:var(--muted)}
+.shape-bar{position:relative;height:12px;border-radius:999px;background:linear-gradient(90deg,var(--tension-soft),var(--turn-soft),var(--setup-soft));border:2px solid var(--line)}
+.shape-dot{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--navy);border:3px solid var(--paper);transform:translate(-50%,-50%);left:50%;transition:left .4s}
 footer{font-size:14px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .35s ease-out}@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}}
 </style>
@@ -130,7 +137,8 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <input type="text" id="sheetLine" autocomplete="off" placeholder="Copy your Beat Sheet line here">
       </div>
       <div>
-        <div class="lbl" style="margin-bottom:6px">My 5 questions</div>
+        <div class="lbl">Story ingredients</div>
+        <div class="ingr-note">A good beat tells these things. Don't answer them like a quiz. Tell it like you are telling a friend a story.</div>
         <ol class="qs" id="qs"></ol>
       </div>
       <div>
@@ -154,7 +162,10 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <div style="font-size:14px;color:var(--muted)" id="photoNote">The coach reads your handwriting and types it for you. You will hear it back.</div>
       </div>
       <div>
-        <label class="lbl" for="story">My sentences (1 answer = 1 sentence)</label>
+        <label class="lbl" for="story">My story</label>
+        <div class="glue" id="glue" aria-label="Story glue words">
+          <span class="glue-lbl">Story glue:</span>
+        </div>
         <textarea id="story" spellcheck="true" placeholder="Tap SAY IT, then talk. Your words show up here."></textarea>
       </div>
       <div class="meter" id="meter"></div>
@@ -177,6 +188,11 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <h3>What's working</h3>
         <div id="starText"></div>
         <div class="quote" id="starQuote"></div>
+      </div>
+      <div class="card" id="shapeCard" style="border:2px solid var(--line)">
+        <h3>Story or quiz?</h3>
+        <div class="shape" aria-hidden="true"><span>Quiz answers</span><div class="shape-bar"><div class="shape-dot" id="shapeDot"></div></div><span>A story</span></div>
+        <div id="shapeNote"></div>
       </div>
       <div class="card next pop" id="nextCard">
         <h3>Your one question</h3>
@@ -237,6 +253,7 @@ const EXAMPLE = {
     answered:[true,true,true,true,true],
     anchor:{ok:true,note:"\"Bolt is a small robot.\" is short and clear. Easy to learn by heart."},
     mine:{name:true,only_mine:true,sound_feeling:true,beat_rule:true},
+    shape:"story", shape_note:"This sounds like a story. Every day, he listens, he loves, he wants. It all flows.",
     next_question:"How does Bolt feel when he hears the birds sing and he can't?",
     next_why:"This can make question 5 even stronger.",
     guide_tip:"All 5 answered. Push for one feeling word in the last sentence; let Bolt's wish land before Tension."
@@ -304,6 +321,28 @@ function renderBeat(){
 }
 function switchBeat(k){if(listening) stopListening();beat=k;renderTabs();renderBeat()}
 
+const GLUE = ["One day","Every day","Then","But","So","Because","Suddenly","At last"];
+GLUE.forEach(w=>{
+  const b=document.createElement("button"); b.type="button"; b.className="chip"; b.textContent=w;
+  b.onclick=()=>addGlue(w);
+  $("glue").append(b);
+});
+function addGlue(w){
+  const t=$("story");
+  if(t.value===EXAMPLE.story){ t.value=""; $("sheetLine").value=""; renderQs(null); showEmptyCoach(); }
+  const cur=t.value.replace(/\s+$/,"");
+  const needsStop = cur && !/[.!?]$/.test(cur);
+  const next = (cur ? cur + (needsStop?". ":" ") : "") + w + " ";
+  t.value = next;
+  if(typeof listening!=="undefined" && listening){ base = next; finals = ""; }
+  renderMeter(); saveDraft();
+  if(mode==="type"){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); }
+}
+function showShape(fb){
+  const pos = {answers:12, mixed:50, story:88}[fb && fb.shape] ;
+  $("shapeCard").hidden = pos===undefined;
+  if(pos!==undefined){ $("shapeDot").style.left = pos+"%"; $("shapeNote").textContent = fb.shape_note || ""; }
+}
 const MINE = [["name","My hero's name"],["only_mine","A place or thing only MY story has"],["sound_feeling","A sound or feeling word"],["beat_rule","The beat rule"]];
 function showFb(fb,isExample){
   lastFb = fb;
@@ -321,6 +360,7 @@ function showFb(fb,isExample){
     $("mine").append(s);
   });
   $("anchorText").textContent = fb.anchor ? fb.anchor.note : "";
+  showShape(fb);
   $("guideTip").innerHTML = "";
   if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
   $("guideTip").hidden = !fb.guide_tip;
@@ -337,6 +377,7 @@ function showEmptyCoach(){
   MINE.forEach(([k,l])=>{const s=document.createElement("span");s.innerHTML=`<span class="dot" aria-hidden="true"></span>`;s.append(l);$("mine").append(s)});
   $("anchorText").textContent = "Your answer to question 1 is your anchor line. Keep it short so you can learn it by heart.";
   $("guideTip").hidden = true;
+  $("shapeCard").hidden = true;
   lastFb = null;
 }
 
@@ -500,7 +541,7 @@ $("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
 if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
 $("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
 function hear(){
-  const txt = lastFb ? `${lastFb.star} Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
+  const txt = lastFb ? `${lastFb.star} ${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
   speak(txt);
 }
 
