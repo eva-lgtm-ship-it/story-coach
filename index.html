@@ -113,6 +113,12 @@ textarea{min-height:230px;resize:vertical}
 .shape{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;font:600 13px var(--display);color:var(--muted)}
 .shape-bar{position:relative;height:12px;border-radius:999px;background:linear-gradient(90deg,var(--tension-soft),var(--turn-soft),var(--setup-soft));border:2px solid var(--line)}
 .shape-dot{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;background:var(--navy);border:3px solid var(--paper);transform:translate(-50%,-50%);left:50%;transition:left .4s}
+.gm{font-size:16px;background:var(--setup-soft);border-radius:12px;padding:8px 12px}
+.gm b{font-family:var(--display)}
+.gmcard{border:2px solid var(--line)}
+.gm-flag{align-self:flex-start;font:600 14px var(--display);border-radius:999px;padding:2px 12px}
+.gm-flag.ok{background:var(--setup-soft);color:var(--ink)}
+.gm-flag.no{background:var(--turn-soft);color:var(--ink)}
 footer{font-size:14px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .35s ease-out}@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}}
 </style>
@@ -175,6 +181,7 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <button class="btn ghost" id="hearMineBtn">Hear my sentences</button>
         <span class="status" id="status" role="status"></span>
       </div>
+      <div class="gm" id="gmRule"></div>
       <div class="music" id="musicTip"></div>
     </section>
 
@@ -198,6 +205,11 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <h3>Your one question</h3>
         <p id="nextText"></p>
         <div style="font-size:15px;color:var(--muted)" id="nextWhy"></div>
+      </div>
+      <div class="card gmcard" id="gmCard">
+        <h3>Growth mindset</h3>
+        <div class="gm-flag" id="gmFlag"></div>
+        <div id="gmNote"></div>
       </div>
       <div class="card" style="border:2px solid var(--line)">
         <h3>Make it mine</h3>
@@ -224,19 +236,19 @@ footer{font-size:14px;color:var(--muted);text-align:center}
 
 <script>
 const BEATS = {
-  setup: {name:"Setup", color:"green", c:"--setup", sub:"Meet my hero",
+  setup: {name:"Setup", color:"green", c:"--setup", sub:"Meet my hero", growth:"My hero wants something they can't do YET.",
     qs:["Who is my hero?","Where does my hero live?","What does my hero do every day?","What does my hero love?","What does my hero want most?"],
     rule:"Show the hero's normal world before anything goes wrong. Nothing bad happens yet.",
     music:"Music tip: your hero's tune plays here for the first time. Can you hear your hero's instrument?"},
-  tension: {name:"Tension", color:"red", c:"--tension", sub:"The hard thing",
+  tension: {name:"Tension", color:"red", c:"--tension", sub:"The hard thing", growth:"My hero tries and makes mistakes. It is hard, but they don't quit forever.",
     qs:["What goes wrong?","What does my hero try first?","What happens?","How does my hero feel? What do they say?","What makes it even harder?"],
     rule:"Something goes wrong. The hero tries, and it does not work yet. It gets harder.",
     music:"Music tip: stuck music. Slow, low, quiet, or one instrument alone. Does your story feel stuck too?"},
-  turn: {name:"Turn", color:"yellow", c:"--turn", sub:"Something changes",
+  turn: {name:"Turn", color:"yellow", c:"--turn", sub:"Something changes", growth:"My hero grows by trying a new strategy, practicing, or asking for help. Not magic. Not luck. Nobody fixes it for them.",
     qs:["Who or what helps my hero?","What new idea or strategy does my hero try?","What does my hero do differently?","What happens this time?","How does it feel?"],
     rule:"The change comes from a new strategy or a helper. It is not magic. The hero does something different.",
     music:"Music tip: this is where the music starts to change. What sound tells us your hero found a new idea?"},
-  resolution: {name:"Resolution", color:"blue", c:"--res", sub:"My hero grows",
+  resolution: {name:"Resolution", color:"blue", c:"--res", sub:"My hero grows", growth:"My hero can do it now BECAUSE they worked at it. They learned something about trying.",
     qs:["What can my hero do now?","What changed for my hero?","How does my hero feel?","What did my hero learn?","What happens next?"],
     rule:"Show what the hero can do now that they could not do before, and what they learned.",
     music:"Music tip: growth music. Fast, high, bright, or everybody playing. Does your ending feel like it grows?"}
@@ -253,6 +265,7 @@ const EXAMPLE = {
     answered:[true,true,true,true,true],
     anchor:{ok:true,note:"\"Bolt is a small robot.\" is short and clear. Easy to learn by heart."},
     mine:{name:true,only_mine:true,sound_feeling:true,beat_rule:true},
+    growth:{ok:true, issue:"none", note:"Bolt wants to sing, but he can't yet. That is a great growth mindset start."},
     shape:"story", shape_note:"This sounds like a story. Every day, he listens, he loves, he wants. It all flows.",
     next_question:"How does Bolt feel when he hears the birds sing and he can't?",
     next_why:"This can make question 5 even stronger.",
@@ -312,6 +325,7 @@ function renderBeat(){
   $("beatTitle").textContent = `${b.name} (${b.color} page)`;
   $("beatTitle").style.color = `var(${b.c})`;
   $("musicTip").textContent = b.music;
+  $("gmRule").innerHTML = "<b>Growth mindset:</b> "; $("gmRule").append(b.growth);
   const d = drafts[beat] || {};
   $("sheetLine").value = d.sheet || "";
   $("story").value = d.story || "";
@@ -338,6 +352,14 @@ function addGlue(w){
   renderMeter(); saveDraft();
   if(mode==="type"){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); }
 }
+function showGrowth(fb){
+  const g = fb && fb.growth;
+  $("gmCard").hidden = !g;
+  if(!g) return;
+  $("gmFlag").className = "gm-flag " + (g.ok ? "ok" : "no");
+  $("gmFlag").textContent = g.ok ? "Power of Yet" : "Not yet";
+  $("gmNote").textContent = g.note || "";
+}
 function showShape(fb){
   const pos = {answers:12, mixed:50, story:88}[fb && fb.shape] ;
   $("shapeCard").hidden = pos===undefined;
@@ -360,7 +382,7 @@ function showFb(fb,isExample){
     $("mine").append(s);
   });
   $("anchorText").textContent = fb.anchor ? fb.anchor.note : "";
-  showShape(fb);
+  showShape(fb); showGrowth(fb);
   $("guideTip").innerHTML = "";
   if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
   $("guideTip").hidden = !fb.guide_tip;
@@ -377,7 +399,7 @@ function showEmptyCoach(){
   MINE.forEach(([k,l])=>{const s=document.createElement("span");s.innerHTML=`<span class="dot" aria-hidden="true"></span>`;s.append(l);$("mine").append(s)});
   $("anchorText").textContent = "Your answer to question 1 is your anchor line. Keep it short so you can learn it by heart.";
   $("guideTip").hidden = true;
-  $("shapeCard").hidden = true;
+  $("shapeCard").hidden = true; $("gmCard").hidden = true;
   lastFb = null;
 }
 
@@ -541,7 +563,7 @@ $("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
 if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
 $("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
 function hear(){
-  const txt = lastFb ? `${lastFb.star} ${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
+  const txt = lastFb ? `${lastFb.star} ${lastFb.growth && !lastFb.growth.ok && lastFb.growth.note ? lastFb.growth.note+" " : ""}${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
   speak(txt);
 }
 
