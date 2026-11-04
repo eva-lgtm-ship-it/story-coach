@@ -44,6 +44,14 @@ h1{margin:0;font:700 clamp(30px,5vw,42px)/1.1 var(--display);color:var(--navy);t
 .tagline{color:var(--muted);font-size:16px;max-width:40ch}
 .tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .tab{font:600 18px var(--display);border:3px solid var(--c);background:var(--paper);color:var(--ink);border-radius:14px;padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbadge{font:600 12px var(--display);border-radius:999px;padding:1px 8px;margin-top:2px;background:var(--paper);color:var(--ink);border:2px solid var(--line)}
+.tabbadge.pass{border-color:var(--ok);color:var(--ok)}
+.verdict{border-radius:16px;padding:12px 16px;display:flex;flex-direction:column;gap:8px;border:3px solid}
+.verdict.pass{background:var(--setup-soft);border-color:var(--ok)}
+.verdict.ny{background:var(--turn-soft);border-color:var(--turn)}
+.verdict-big{font:700 28px var(--display);color:var(--ink);letter-spacing:.02em}
+.verdict-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:16px}
+.verdict-list li{display:flex;gap:8px;align-items:center}
 .tab small{font:500 12px var(--body);color:var(--muted)}
 .tab[aria-selected="true"]{background:var(--c);color:#fff}
 .tab[aria-selected="true"] small{color:#fff}
@@ -191,6 +199,10 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <h2 id="coachTitle">Coach notes</h2>
       </div>
       <div class="example-flag" id="exampleFlag">Example: Bolt's Setup</div>
+      <div class="verdict" id="verdict" hidden>
+        <div class="verdict-big" id="verdictBig"></div>
+        <ul class="verdict-list" id="verdictList"></ul>
+      </div>
       <div class="card star pop" id="starCard">
         <h3>What's working</h3>
         <div id="starText"></div>
@@ -293,7 +305,8 @@ function renderTabs(){
     t.className="tab"; t.role="tab"; t.id="tab-"+k;
     t.style.setProperty("--c",`var(${b.c})`);
     t.setAttribute("aria-selected", k===beat ? "true":"false");
-    t.innerHTML = `<span>${b.name}</span><small>${b.sub}</small>`;
+    const v = drafts[k] && drafts[k].fb ? verdict(drafts[k].fb).pass : null;
+    t.innerHTML = `<span>${b.name}</span><small>${b.sub}</small>` + (v===null ? "" : `<span class="tabbadge ${v?"pass":"ny"}">${v?"✓ Pass":"Not yet"}</span>`);
     t.onclick = ()=>switchBeat(k);
     $("tabs").append(t);
   });
@@ -352,6 +365,30 @@ function addGlue(w){
   renderMeter(); saveDraft();
   if(mode==="type"){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); }
 }
+// One clear bar for every beat. A beat passes only when all 4 are true.
+function verdict(fb){
+  const n = Array.isArray(fb.answered) ? fb.answered.filter(Boolean).length : 0;
+  const checks = [
+    {ok: !!(fb.growth && fb.growth.ok), label: "Growth mindset"},
+    {ok: fb.shape === "story", label: "Sounds like a story, not quiz answers"},
+    {ok: n >= 4, label: `Story ingredients: ${n} of 5 (need 4)`},
+    {ok: !!(fb.mine && fb.mine.beat_rule), label: "Does this beat's job"},
+  ];
+  return {pass: checks.every(c=>c.ok), checks};
+}
+function showVerdict(fb){
+  const v = verdict(fb);
+  $("verdict").hidden = false;
+  $("verdict").className = "verdict " + (v.pass ? "pass" : "ny");
+  $("verdictBig").textContent = v.pass ? `✓ PASS: ${BEATS[beat].name}` : `NOT YET: ${BEATS[beat].name}`;
+  $("verdictList").innerHTML = "";
+  v.checks.forEach(c=>{
+    const li=document.createElement("li");
+    li.innerHTML = `<span class="dot ${c.ok?"done":""}" aria-hidden="true">${c.ok?"✓":""}</span>`;
+    li.append(c.label + (c.ok ? "" : " (not yet)"));
+    $("verdictList").append(li);
+  });
+}
 function showGrowth(fb){
   const g = fb && fb.growth;
   $("gmCard").hidden = !g;
@@ -382,7 +419,7 @@ function showFb(fb,isExample){
     $("mine").append(s);
   });
   $("anchorText").textContent = fb.anchor ? fb.anchor.note : "";
-  showShape(fb); showGrowth(fb);
+  showShape(fb); showGrowth(fb); showVerdict(fb);
   $("guideTip").innerHTML = "";
   if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
   $("guideTip").hidden = !fb.guide_tip;
@@ -399,7 +436,7 @@ function showEmptyCoach(){
   MINE.forEach(([k,l])=>{const s=document.createElement("span");s.innerHTML=`<span class="dot" aria-hidden="true"></span>`;s.append(l);$("mine").append(s)});
   $("anchorText").textContent = "Your answer to question 1 is your anchor line. Keep it short so you can learn it by heart.";
   $("guideTip").hidden = true;
-  $("shapeCard").hidden = true; $("gmCard").hidden = true;
+  $("shapeCard").hidden = true; $("gmCard").hidden = true; $("verdict").hidden = true;
   lastFb = null;
 }
 
@@ -448,7 +485,7 @@ async function ask(){
     if(photo && typeof fb.transcript === "string" && fb.transcript.trim()){
       $("story").value = fb.transcript.trim(); renderMeter(); saveDraft();
     }
-    drafts[beat] = {...(drafts[beat]||{}), fb}; store.set("drafts",drafts);
+    drafts[beat] = {...(drafts[beat]||{}), fb}; store.set("drafts",drafts); renderTabs();
     showFb(fb,false);
     $("status").textContent = photo ? "Done. Press Hear my sentences to check the coach read your page right." : "Done. Press Hear it to hear your one question.";
   }catch(e){
@@ -563,7 +600,7 @@ $("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
 if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
 $("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
 function hear(){
-  const txt = lastFb ? `${lastFb.star} ${lastFb.growth && !lastFb.growth.ok && lastFb.growth.note ? lastFb.growth.note+" " : ""}${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
+  const txt = lastFb ? `${verdict(lastFb).pass ? "Pass." : "Not yet."} ${lastFb.star} ${lastFb.growth && !lastFb.growth.ok && lastFb.growth.note ? lastFb.growth.note+" " : ""}${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
   speak(txt);
 }
 
