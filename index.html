@@ -127,6 +127,15 @@ textarea{min-height:230px;resize:vertical}
 .gm-flag{align-self:flex-start;font:600 14px var(--display);border-radius:999px;padding:2px 12px}
 .gm-flag.ok{background:var(--setup-soft);color:var(--ink)}
 .gm-flag.no{background:var(--turn-soft);color:var(--ink)}
+.tabs{grid-template-columns:repeat(5,1fr)}
+@media (max-width:820px){.tabs{grid-template-columns:repeat(2,1fr)}.tab.whole{grid-column:span 2}}
+.tab.whole{--c:var(--navy)}
+.arc-steps{margin:4px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:2px}
+.whole-beats{display:flex;flex-direction:column;gap:10px}
+.wb{border-left:6px solid var(--c);background:var(--c-soft);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:4px}
+.wb-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font:600 16px var(--display)}
+.wb-text{font-size:17px}
+.wb-empty{color:var(--muted);font-style:italic}
 footer{font-size:14px;color:var(--muted);text-align:center}
 @media (prefers-reduced-motion:no-preference){.pop{animation:pop .35s ease-out}@keyframes pop{from{transform:scale(.97);opacity:.6}to{transform:none;opacity:1}}}
 </style>
@@ -189,8 +198,27 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <button class="btn ghost" id="hearMineBtn">Hear my sentences</button>
         <span class="status" id="status" role="status"></span>
       </div>
-      <div class="gm" id="gmRule"></div>
       <div class="music" id="musicTip"></div>
+    </section>
+
+    <section class="panel beat" id="wholePanel" aria-labelledby="wholeTitle" hidden>
+      <h2 id="wholeTitle" style="margin:0;font:700 26px var(--display);color:var(--navy)">My whole story</h2>
+      <div style="font-size:17px">Your 4 beats together. The coach checks that the <b>whole story</b> shows a growth mindset.</div>
+      <div class="gm">
+        <b>A growth mindset story has:</b>
+        <ol class="arc-steps">
+          <li>A hero who can't do something <b>yet</b></li>
+          <li>Trying, mistakes, and hard feelings</li>
+          <li>Growing by effort: a new strategy, practice, or help. Not magic. Not luck.</li>
+          <li>Doing it at the end <b>because</b> they worked at it, and learning something</li>
+        </ol>
+      </div>
+      <div id="wholeBeats" class="whole-beats"></div>
+      <div class="row">
+        <button class="btn" id="wholeBtn">Check my whole story</button>
+        <button class="btn ghost" id="hearWholeBtn">Hear my whole story</button>
+        <span class="status" id="wholeStatus" role="status"></span>
+      </div>
     </section>
 
     <section class="panel" aria-labelledby="coachTitle" id="coachPanel">
@@ -218,16 +246,17 @@ footer{font-size:14px;color:var(--muted);text-align:center}
         <p id="nextText"></p>
         <div style="font-size:15px;color:var(--muted)" id="nextWhy"></div>
       </div>
-      <div class="card gmcard" id="gmCard">
-        <h3>Growth mindset</h3>
+      <div class="card gmcard" id="gmCard" hidden>
+        <h3>Growth mindset: whole story</h3>
         <div class="gm-flag" id="gmFlag"></div>
         <div id="gmNote"></div>
+        <ul class="verdict-list" id="gmArc"></ul>
       </div>
-      <div class="card" style="border:2px solid var(--line)">
+      <div class="card" id="mineCard" style="border:2px solid var(--line)">
         <h3>Make it mine</h3>
         <div class="mine" id="mine"></div>
       </div>
-      <div class="card" style="border:2px solid var(--line)">
+      <div class="card" id="anchorCard" style="border:2px solid var(--line)">
         <h3>Anchor line</h3>
         <div id="anchorText"></div>
       </div>
@@ -310,6 +339,13 @@ function renderTabs(){
     t.onclick = ()=>switchBeat(k);
     $("tabs").append(t);
   });
+  const w = document.createElement("button");
+  w.className = "tab whole"; w.role = "tab"; w.id = "tab-whole";
+  w.setAttribute("aria-selected", beat==="whole" ? "true":"false");
+  const wv = drafts.whole && drafts.whole.fb ? wholeVerdict(drafts.whole.fb).pass : null;
+  w.innerHTML = `<span>Whole story</span><small>Growth mindset</small>` + (wv===null ? "" : `<span class="tabbadge ${wv?"pass":"ny"}">${wv?"✓ Pass":"Not yet"}</span>`);
+  w.onclick = ()=>switchBeat("whole");
+  $("tabs").append(w);
 }
 function renderQs(answered){
   const b = BEATS[beat];
@@ -338,7 +374,6 @@ function renderBeat(){
   $("beatTitle").textContent = `${b.name} (${b.color} page)`;
   $("beatTitle").style.color = `var(${b.c})`;
   $("musicTip").textContent = b.music;
-  $("gmRule").innerHTML = "<b>Growth mindset:</b> "; $("gmRule").append(b.growth);
   const d = drafts[beat] || {};
   $("sheetLine").value = d.sheet || "";
   $("story").value = d.story || "";
@@ -346,7 +381,14 @@ function renderBeat(){
   renderMeter();
   if(d.fb){showFb(d.fb,false)} else {showEmptyCoach()}
 }
-function switchBeat(k){if(listening) stopListening();beat=k;renderTabs();renderBeat()}
+function switchBeat(k){
+  if(listening) stopListening();
+  beat=k; renderTabs();
+  const whole = k==="whole";
+  $("writePanel").hidden = whole; $("wholePanel").hidden = !whole;
+  $("mineCard").hidden = whole; $("anchorCard").hidden = whole;
+  if(whole) renderWhole(); else { $("gmCard").hidden = true; renderBeat(); }
+}
 
 const GLUE = ["One day","Every day","Then","But","So","Because","Suddenly","At last"];
 GLUE.forEach(w=>{
@@ -365,11 +407,10 @@ function addGlue(w){
   renderMeter(); saveDraft();
   if(mode==="type"){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); }
 }
-// One clear bar for every beat. A beat passes only when all 4 are true.
+// One clear bar for every beat. A beat passes only when all 3 are true.
 function verdict(fb){
   const n = Array.isArray(fb.answered) ? fb.answered.filter(Boolean).length : 0;
   const checks = [
-    {ok: !!(fb.growth && fb.growth.ok), label: "Growth mindset"},
     {ok: fb.shape === "story", label: "Sounds like a story, not quiz answers"},
     {ok: n >= 4, label: `Story ingredients: ${n} of 5 (need 4)`},
     {ok: !!(fb.mine && fb.mine.beat_rule), label: "Does this beat's job"},
@@ -389,14 +430,86 @@ function showVerdict(fb){
     $("verdictList").append(li);
   });
 }
-function showGrowth(fb){
-  const g = fb && fb.growth;
-  $("gmCard").hidden = !g;
-  if(!g) return;
+const ARC = [["not_yet_goal","A hero who can't do something yet"],["struggle","Trying, mistakes, hard feelings"],["effort","Grows by effort, strategy, practice, or help (not magic or luck)"],["because_effort","Does it at the end BECAUSE of the work"],["lesson","Learns something about trying"]];
+function beatPassed(k){ return !!(drafts[k] && drafts[k].fb && verdict(drafts[k].fb).pass); }
+function wholeVerdict(fb){
+  const checks = ORDER.map(k=>({ok: beatPassed(k), label: `${BEATS[k].name} beat passed`}));
+  checks.push({ok: !!(fb && fb.growth && fb.growth.ok), label: "Growth mindset in the whole story"});
+  return {pass: checks.every(c=>c.ok), checks};
+}
+function renderWhole(){
+  document.documentElement.style.setProperty("--c","var(--navy)");
+  document.documentElement.style.setProperty("--c-soft","var(--navy-soft)");
+  $("wholeBeats").innerHTML = "";
+  ORDER.forEach(k=>{
+    const b = BEATS[k], d = drafts[k] || {}, txt = (d.story||"").trim();
+    const div = document.createElement("div"); div.className = "wb";
+    div.style.setProperty("--c",`var(${b.c})`); div.style.setProperty("--c-soft",`var(${b.c}-soft)`);
+    const head = document.createElement("div"); head.className = "wb-head";
+    const nm = document.createElement("span"); nm.textContent = b.name;
+    head.append(nm);
+    if(d.fb){ const bd=document.createElement("span"); const ok=verdict(d.fb).pass; bd.className="tabbadge "+(ok?"pass":"ny"); bd.textContent = ok?"✓ Pass":"Not yet"; head.append(bd); }
+    const body = document.createElement("div"); body.className = "wb-text" + (txt?"":" wb-empty");
+    body.textContent = txt || "Not written yet. Tap the " + b.name + " button at the top.";
+    div.append(head, body); $("wholeBeats").append(div);
+  });
+  const fb = drafts.whole && drafts.whole.fb;
+  if(fb) showWholeFb(fb); else showWholeEmpty();
+}
+function showWholeEmpty(){
+  $("exampleFlag").hidden = true; $("shapeCard").hidden = true; $("gmCard").hidden = true;
+  $("verdict").hidden = true; $("guideTip").hidden = true;
+  $("starText").textContent = "Write all 4 beats, then press Check my whole story.";
+  $("starQuote").textContent = "";
+  $("nextText").textContent = "What can't your hero do yet at the start?";
+  $("nextWhy").textContent = "";
+  lastFb = null;
+}
+function showWholeFb(fb){
+  lastFb = Object.assign({whole:true}, fb);
+  $("exampleFlag").hidden = true; $("shapeCard").hidden = true;
+  $("starText").textContent = fb.star || "";
+  $("starQuote").textContent = fb.star_quote ? `“${fb.star_quote}”` : "";
+  $("nextText").textContent = fb.next_question || "";
+  $("nextWhy").textContent = fb.beat_to_fix && BEATS[fb.beat_to_fix] ? `Work on your ${BEATS[fb.beat_to_fix].name} beat.` : (fb.next_why || "");
+  const g = fb.growth || {};
+  $("gmCard").hidden = false;
   $("gmFlag").className = "gm-flag " + (g.ok ? "ok" : "no");
   $("gmFlag").textContent = g.ok ? "Power of Yet" : "Not yet";
   $("gmNote").textContent = g.note || "";
+  $("gmArc").innerHTML = "";
+  ARC.forEach(([k,l])=>{ const ok = g.arc && g.arc[k]; const li=document.createElement("li");
+    li.innerHTML = `<span class="dot ${ok?"done":""}" aria-hidden="true">${ok?"✓":""}</span>`; li.append(l + (ok?"":" (not yet)")); $("gmArc").append(li); });
+  const v = wholeVerdict(fb);
+  $("verdict").hidden = false;
+  $("verdict").className = "verdict " + (v.pass ? "pass" : "ny");
+  $("verdictBig").textContent = v.pass ? "✓ PASS: Whole story" : "NOT YET: Whole story";
+  $("verdictList").innerHTML = "";
+  v.checks.forEach(c=>{ const li=document.createElement("li"); li.innerHTML = `<span class="dot ${c.ok?"done":""}" aria-hidden="true">${c.ok?"✓":""}</span>`; li.append(c.label + (c.ok?"":" (not yet)")); $("verdictList").append(li); });
+  $("guideTip").innerHTML = "";
+  if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
+  $("guideTip").hidden = !fb.guide_tip;
 }
+async function askWhole(){
+  const parts = {}; let have = 0;
+  ORDER.forEach(k=>{ parts[k] = ((drafts[k]&&drafts[k].story)||"").slice(0,3000); if(parts[k].trim().split(/\s+/).length>=4) have++; });
+  if(have < 4){ $("wholeStatus").textContent = "Write all 4 beats first. Then check the whole story."; return; }
+  $("wholeBtn").disabled = true; $("wholeStatus").textContent = "The coach is reading your whole story...";
+  try{
+    const r = await fetch("/api/feedback",{method:"POST",headers:{"content-type":"application/json","x-class-code":classCode()},body:JSON.stringify({beat:"whole", stories:parts})});
+    if(r.status===401){ $("codeBox").hidden = false; throw {code:"bad_code"}; }
+    if(r.status===429) throw {code:"rate_limited"};
+    if(!r.ok) throw {code:"upstream_error"};
+    const fb = await r.json();
+    if(!fb || !fb.next_question) throw {code:"invalid_json"};
+    drafts.whole = {fb}; store.set("drafts",drafts); renderTabs();
+    showWholeFb(fb);
+    $("wholeStatus").textContent = "Done. Press Hear it to hear the coach.";
+  }catch(e){ $("wholeStatus").textContent = copyFor(e && e.code); }
+  finally{ $("wholeBtn").disabled = false; }
+}
+$("wholeBtn").onclick = askWhole;
+$("hearWholeBtn").onclick = ()=>speak(ORDER.map(k=>(drafts[k]&&drafts[k].story)||"").join(" ").trim() || "There is no story yet.");
 function showShape(fb){
   const pos = {answers:12, mixed:50, story:88}[fb && fb.shape] ;
   $("shapeCard").hidden = pos===undefined;
@@ -419,7 +532,7 @@ function showFb(fb,isExample){
     $("mine").append(s);
   });
   $("anchorText").textContent = fb.anchor ? fb.anchor.note : "";
-  showShape(fb); showGrowth(fb); showVerdict(fb);
+  showShape(fb); $("gmCard").hidden = true; showVerdict(fb);
   $("guideTip").innerHTML = "";
   if(fb.guide_tip){const b=document.createElement("b");b.textContent="For the guide: ";$("guideTip").append(b,fb.guide_tip)}
   $("guideTip").hidden = !fb.guide_tip;
@@ -600,7 +713,7 @@ $("sayBtn").onclick = ()=>{ listening ? stopListening() : startListening(); };
 if(!SR){ $("sayBtn").hidden = true; $("sayStep").hidden = true; $("sayFallback").hidden = false; }
 $("hearMineBtn").onclick = ()=>speak($("story").value || "There are no sentences yet.");
 function hear(){
-  const txt = lastFb ? `${verdict(lastFb).pass ? "Pass." : "Not yet."} ${lastFb.star} ${lastFb.growth && !lastFb.growth.ok && lastFb.growth.note ? lastFb.growth.note+" " : ""}${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
+  const txt = lastFb ? `${(lastFb.whole ? wholeVerdict(lastFb) : verdict(lastFb)).pass ? "Pass." : "Not yet."} ${lastFb.star} ${lastFb.growth && lastFb.growth.note ? lastFb.growth.note+" " : ""}${lastFb.shape && lastFb.shape!=="story" && lastFb.shape_note ? lastFb.shape_note+" " : ""}Here is your one question. ${lastFb.next_question}` : $("nextText").textContent;
   speak(txt);
 }
 
